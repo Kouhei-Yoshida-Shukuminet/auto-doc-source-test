@@ -1,0 +1,14 @@
+{
+  "name": "auto-doc-source-test",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AIドキュメント自動更新PoC用の簡易Web電卓",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/serve.js",
+    "test": "node --test tests/"
+  }
+}

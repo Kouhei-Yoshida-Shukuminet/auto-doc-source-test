@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple Calculator</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="calculator" aria-label="電卓">
+      <output id="display" class="display" aria-live="polite">0</output>
+      <div class="keys">
+        <button data-type="clear" class="key-clear">C</button>
+        <button data-type="operator" data-value="/">÷</button>
+        <button data-type="operator" data-value="*">×</button>
+        <button data-type="operator" data-value="-">−</button>
+
+        <button data-type="digit" data-value="7">7</button>
+        <button data-type="digit" data-value="8">8</button>
+        <button data-type="digit" data-value="9">9</button>
+        <button data-type="operator" data-value="+" class="key-plus">+</button>
+
+        <button data-type="digit" data-value="4">4</button>
+        <button data-type="digit" data-value="5">5</button>
+        <button data-type="digit" data-value="6">6</button>
+
+        <button data-type="digit" data-value="1">1</button>
+        <button data-type="digit" data-value="2">2</button>
+        <button data-type="digit" data-value="3">3</button>
+        <button data-type="equals" class="key-equals">=</button>
+
+        <button data-type="digit" data-value="0" class="key-zero">0</button>
+        <button data-type="decimal">.</button>
+      </div>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

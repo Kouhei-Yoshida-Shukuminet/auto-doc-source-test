@@ -1,0 +1,89 @@
+# Workflow A：実装PRが main にマージされたら、AIでドキュメント影響を分析し docs repo へ更新PRを作成する
+name: Docs sync (AI)
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: ドキュメントを生成する実装PRの番号（再実行・手動確認用）
+        required: true
+      ai_mode:
+        description: AI呼び出しモード（mock は Claude API を呼ばずに流れだけ確認する）
+        type: choice
+        options: [anthropic, mock]
+        default: anthropic
+
+# 実装repoに対しては読み取りのみ。docs repo への書き込みは DOCS_REPO_TOKEN で行う
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: docs-sync-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  docs-pr:
+    # マージされたPRのみ（closeだけのPR、fork からのPRは対象外）
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DOCS_REPO: ${{ vars.DOCS_REPO || 'Kouhei-Yoshida-Shukuminet/auto-doc-result-test' }}
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+      AUTO_DOC_AI_MODE: ${{ inputs.ai_mode || vars.AUTO_DOC_AI_MODE || 'anthropic' }}
+    steps:
+      - name: Check secrets
+        env:
+          DOCS_REPO_TOKEN: ${{ secrets.DOCS_REPO_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          [ -n "$DOCS_REPO_TOKEN" ] || { echo "::error::Secret DOCS_REPO_TOKEN is not set"; exit 1; }
+          [ "$AUTO_DOC_AI_MODE" = mock ] || [ -n "$ANTHROPIC_API_KEY" ] || { echo "::error::Secret ANTHROPIC_API_KEY is not set"; exit 1; }
+
+      # docs repo（Source of Truth）の main を取得。AI処理ロジックとプロンプトも docs repo の automation/ にある
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DOCS_REPO }}
+          token: ${{ secrets.DOCS_REPO_TOKEN }}
+          ref: main
+          path: docs
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/automation/package-lock.json
+
+      - run: npm ci
+        working-directory: docs/automation
+
+      - name: Collect Issue / PR / diff and generate docs with AI
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: >-
+          node docs/automation/src/cli/generate-docs.js
+          --source-repo "$GITHUB_REPOSITORY"
+          --pr "$PR_NUMBER"
+          --docs-dir docs
+          --out "$RUNNER_TEMP/auto-doc"
+
+      - name: Create docs PR
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_REPO_TOKEN }}
+        run: docs/automation/scripts/open-docs-pr.sh docs "$RUNNER_TEMP/auto-doc"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: auto-doc-${{ env.PR_NUMBER }}
+          path: ${{ runner.temp }}/auto-doc
+          if-no-files-found: ignore
