@@ -3,10 +3,13 @@ import { initialState, reduce } from './calculator.js';
 let state = { ...initialState };
 
 const display = document.querySelector('#display');
+const errorMessage = document.querySelector('#error');
 const keys = document.querySelector('.keys');
 
 function render() {
   display.textContent = state.display;
+  display.classList.toggle('is-error', Boolean(state.error));
+  errorMessage.textContent = state.error ?? '';
 }
 
 function dispatch(action) {

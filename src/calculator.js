@@ -2,11 +2,21 @@
 
 export const OPERATORS = ['+', '-', '*', '/'];
 
+export const DIVISION_BY_ZERO_MESSAGE = '0で割ることはできません';
+
+export class DivisionByZeroError extends Error {
+  constructor() {
+    super(DIVISION_BY_ZERO_MESSAGE);
+    this.name = 'DivisionByZeroError';
+  }
+}
+
 export const initialState = Object.freeze({
   display: '0',
   stored: null,
   operator: null,
   waitingForOperand: false,
+  error: null,
 });
 
 export function calculate(a, operator, b) {
@@ -18,6 +28,7 @@ export function calculate(a, operator, b) {
     case '*':
       return a * b;
     case '/':
+      if (b === 0) throw new DivisionByZeroError();
       return a / b;
     default:
       throw new Error(`Unknown operator: ${operator}`);
@@ -30,6 +41,11 @@ export function formatNumber(value) {
 }
 
 export function reduce(state, action) {
+  // エラー表示中は、クリアと新しい数値の入力だけを受け付ける
+  if (state.error) {
+    if (action.type === 'digit' || action.type === 'decimal') return reduce({ ...initialState }, action);
+    if (action.type !== 'clear') return state;
+  }
   switch (action.type) {
     case 'digit':
       return inputDigit(state, action.value);
@@ -68,14 +84,33 @@ function inputOperator(state, operator) {
     return { ...state, operator };
   }
   if (state.operator && state.stored !== null) {
-    const result = calculate(state.stored, state.operator, current);
-    return { display: formatNumber(result), stored: result, operator, waitingForOperand: true };
+    return withCalculation(state, current, (result) => ({
+      display: formatNumber(result),
+      stored: result,
+      operator,
+      waitingForOperand: true,
+      error: null,
+    }));
   }
   return { ...state, stored: current, operator, waitingForOperand: true };
 }
 
 function evaluate(state) {
   if (!state.operator || state.stored === null) return state;
-  const result = calculate(state.stored, state.operator, Number(state.display));
-  return { display: formatNumber(result), stored: null, operator: null, waitingForOperand: true };
+  return withCalculation(state, Number(state.display), (result) => ({
+    display: formatNumber(result),
+    stored: null,
+    operator: null,
+    waitingForOperand: true,
+    error: null,
+  }));
+}
+
+function withCalculation(state, operand, onResult) {
+  try {
+    return onResult(calculate(state.stored, state.operator, operand));
+  } catch (error) {
+    if (!(error instanceof DivisionByZeroError)) throw error;
+    return { ...initialState, display: 'エラー', error: error.message };
+  }
 }

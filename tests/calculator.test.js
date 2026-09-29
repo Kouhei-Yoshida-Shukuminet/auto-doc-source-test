@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculate, formatNumber, initialState, reduce } from '../src/calculator.js';
+import { DIVISION_BY_ZERO_MESSAGE, DivisionByZeroError, calculate, formatNumber, initialState, reduce } from '../src/calculator.js';
 
 function press(...keys) {
   return keys.reduce((state, key) => {
@@ -40,4 +40,31 @@ test('小数を扱える', () => {
 
 test('クリアで初期状態に戻る', () => {
   assert.deepEqual(press('1', '+', '2', 'C'), { ...initialState });
+});
+
+test('0で割るとエラーを表示する', () => {
+  assert.throws(() => calculate(1, '/', 0), DivisionByZeroError);
+  const state = press('5', '/', '0', '=');
+  assert.equal(state.display, 'エラー');
+  assert.equal(state.error, DIVISION_BY_ZERO_MESSAGE);
+  assert.equal(press('0', '/', '0', '=').error, DIVISION_BY_ZERO_MESSAGE);
+});
+
+test('連続計算中の0除算もエラーになる', () => {
+  assert.equal(press('8', '/', '0', '+').error, DIVISION_BY_ZERO_MESSAGE);
+});
+
+test('エラー表示中は演算子と=を受け付けない', () => {
+  const state = press('5', '/', '0', '=', '+', '3', '=');
+  assert.equal(state.error, null);
+  assert.equal(state.display, '3');
+  assert.deepEqual(press('5', '/', '0', '=', '+', '='), press('5', '/', '0', '='));
+});
+
+test('クリアまたは数字入力でエラーが解除される', () => {
+  assert.deepEqual(press('5', '/', '0', '=', 'C'), { ...initialState });
+  const state = press('5', '/', '0', '=', '7');
+  assert.equal(state.error, null);
+  assert.equal(state.display, '7');
+  assert.equal(press('5', '/', '0', '=', '7', '+', '1', '=').display, '8');
 });
